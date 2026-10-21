@@ -1,7 +1,8 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase, supabaseConfigured } from "@/lib/supabase";
 
 export default function Home() {
   const [section, setSection] = useState("home");
