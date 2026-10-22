@@ -35,11 +35,12 @@ export default function LoginPage() {
 } catch (err) {
   console.error("Login error:", err);
 
-  setError(
-    err instanceof Error
-      ? `లాగిన్ సమస్య: ${err.message}`
-      : "తెలియని లాగిన్ సమస్య వచ్చింది."
-  );
+  const details =
+    typeof err === "object" && err !== null && "message" in err
+      ? String((err as { message?: unknown }).message ?? "")
+      : String(err);
+
+  setError(`లాగిన్ సమస్య: ${details || String(err)}`);
 } finally {
   setLoading(false);
 }
