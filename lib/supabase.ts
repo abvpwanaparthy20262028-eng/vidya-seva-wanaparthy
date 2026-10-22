@@ -1,3 +1,4 @@
+
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -7,9 +8,14 @@ export const supabaseConfigured = Boolean(
   supabaseUrl && supabaseAnonKey
 );
 
-export const supabase = supabaseConfigured
-  ? createClient(supabaseUrl!, supabaseAnonKey!)
-  : createClient(
-      "https://placeholder.supabase.co",
-      "placeholder-key"
-    );
+export const supabase = createClient(
+  supabaseUrl || "https://placeholder.supabase.co",
+  supabaseAnonKey || "placeholder-key",
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
+);
