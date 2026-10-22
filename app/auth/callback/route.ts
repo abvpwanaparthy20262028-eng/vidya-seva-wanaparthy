@@ -7,10 +7,12 @@ export async function GET(request: NextRequest) {
   const code = url.searchParams.get("code");
 
   if (!code) {
-    return NextResponse.redirect(new URL("/login?error=missing_code", url.origin));
+    return NextResponse.redirect(
+      new URL("/login?error=missing_code", url.origin)
+    );
   }
 
-  let response = NextResponse.redirect(new URL("/", url.origin));
+  const response = NextResponse.redirect(new URL("/", url.origin));
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,27 +23,12 @@ export async function GET(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(
-  (
-    cookiesToSet: {
-      name: string;
-      value: string;
-      options?: any;
-    }[]
-  ) => {
-    cookiesToSet.forEach(({ name, value }) => {
-      request.cookies.set(name, value);
-    });
-
-    response = NextResponse.redirect(new URL("/", url.origin));
-
-    cookiesToSet.forEach(({ name, value, options }) => {
-      response.cookies.set(name, value, options);
-    });
-  }
-),
-
-          response = NextResponse.redirect(new URL("/", url.origin));
-
+          cookiesToSet: {
+            name: string;
+            value: string;
+            options?: any;
+          }[]
+        ) {
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
           });
@@ -53,7 +40,9 @@ export async function GET(request: NextRequest) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    return NextResponse.redirect(new URL("/login?error=auth", url.origin));
+    return NextResponse.redirect(
+      new URL("/login?error=auth", url.origin)
+    );
   }
 
   return response;
