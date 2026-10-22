@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase, supabaseConfigured } from "@/lib/supabase";
 
 type SurveyForm = {
@@ -186,6 +187,12 @@ export default function Home() {
     useState<TrackedIssue | null>(null);
   const [trackingError, setTrackingError] = useState("");
 
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
   useEffect(() => {
     let active = true;
 
@@ -234,6 +241,75 @@ export default function Home() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSession() {
+      try {
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (active) setAuthUser(data.session?.user ?? null);
+      } catch (err) {
+        console.error("Auth session error:", err);
+      } finally {
+        if (active) setAuthLoading(false);
+      }
+    }
+
+    void loadSession();
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (active) setAuthUser(session?.user ?? null);
+    });
+
+    return () => {
+      active = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  async function submitLogin(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoginLoading(true);
+    setMessage("");
+    setError("");
+
+    if (!supabaseConfigured) {
+      setError("Supabase సెట్టింగ్స్ సరిగా లేవు. NEXT_PUBLIC_SUPABASE_URL మరియు NEXT_PUBLIC_SUPABASE_ANON_KEY తనిఖీ చేయండి.");
+      setLoginLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error: loginError } = await supabase.auth.signInWithPassword({
+        email: loginEmail.trim(),
+        password: loginPassword,
+      });
+      if (loginError) throw loginError;
+      setAuthUser(data.user);
+      setLoginPassword("");
+      setMessage("లాగిన్ విజయవంతమైంది. ఇప్పుడు సర్వే లేదా ఫిర్యాదును నమోదు చేయవచ్చు.");
+      setSection("home");
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("లాగిన్ కాలేదు. ఇమెయిల్, పాస్‌వర్డ్ సరిచూసి మళ్లీ ప్రయత్నించండి.");
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  async function logout() {
+    setError("");
+    setMessage("");
+    const { error: logoutError } = await supabase.auth.signOut();
+    if (logoutError) {
+      setError("లాగౌట్ కాలేదు. మళ్లీ ప్రయత్నించండి.");
+      return;
+    }
+    setAuthUser(null);
+    setSection("home");
+    setMessage("మీరు విజయవంతంగా లాగౌట్ అయ్యారు.");
+  }
 
   function navigate(next: string) {
     setSection(next);
@@ -517,8 +593,19 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <div style={{ fontSize: 13, color: "#d6eee1" }}>
-              విద్య • సమానత్వం • అభివృద్ధి
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 13, color: "#d6eee1" }}>
+                విద్య • సమానత్వం • అభివృద్ధి
+              </div>
+              {authUser ? (
+                <button type="button" onClick={logout} style={{ ...styles.secondaryButton, padding: "9px 12px" }}>
+                  లాగౌట్
+                </button>
+              ) : (
+                <button type="button" onClick={() => navigate("login")} style={{ ...styles.secondaryButton, padding: "9px 12px" }}>
+                  లాగిన్
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -548,6 +635,7 @@ export default function Home() {
             ["ఫిర్యాదు నమోదు", "complaint"],
             ["ఫిర్యాదు స్థితి", "track"],
             ["మా లక్ష్యం", "about"],
+            [authUser ? "నా ఖాతా" : "లాగిన్", "login"],
           ].map(([text, target]) => (
             <button
               type="button"
@@ -911,7 +999,7 @@ export default function Home() {
           </h1>
           <p style={{ color: "#61766a", lineHeight: 1.7 }}>
             సంస్థ వివరాలు మరియు అక్కడి విద్యా సౌకర్యాల పరిస్థితిని
-            నమోదు చేయండి.
+            నమోదు చేయండి. {authUser ? "మీరు లాగిన్ అయ్యారు." : "సేవ్ చేయడానికి ముందుగా లాగిన్ కావాలి."}
           </p>
 
           <form onSubmit={submitSurvey}>
@@ -1048,6 +1136,11 @@ export default function Home() {
               placeholder="సమస్యలను వివరించండి"
             />
 
+            {!authUser && (
+              <p style={{ color: "#946200", lineHeight: 1.8 }}>
+                సర్వే సేవ్ చేయడానికి <button type="button" onClick={() => navigate("login")} style={{ ...styles.secondaryButton, padding: "6px 10px" }}>ముందుగా లాగిన్ చేయండి</button>
+              </p>
+            )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               <button
                 style={styles.button}
@@ -1082,9 +1175,14 @@ export default function Home() {
           </h1>
           <p style={{ color: "#61766a", lineHeight: 1.7 }}>
             ఫిర్యాదులో వ్యక్తిగత లేదా సున్నితమైన వివరాలు చేర్చవద్దు.
-            ఫిర్యాదు నమోదు చేయడానికి లాగిన్ అవసరం.
+            {authUser ? " మీరు లాగిన్ అయ్యారు; ఇప్పుడు ఫిర్యాదు నమోదు చేయవచ్చు." : " ఫిర్యాదు నమోదు చేయడానికి ముందుగా లాగిన్ కావాలి."}
           </p>
 
+          {!authUser && (
+            <p style={{ color: "#946200", lineHeight: 1.8 }}>
+              ఫిర్యాదు సేవ్ చేయడానికి <button type="button" onClick={() => navigate("login")} style={{ ...styles.secondaryButton, padding: "6px 10px" }}>ముందుగా లాగిన్ చేయండి</button>
+            </p>
+          )}
           <form onSubmit={submitComplaint}>
             {label("సమస్య రకం *", "complaint-category")}
             <select
@@ -1290,6 +1388,69 @@ export default function Home() {
             గమనిక: స్థితి చూపించడానికి Supabaseలో track_issue_case ఫంక్షన్
             సరిగ్గా అమలై ఉండాలి.
           </p>
+        </section>
+      )}
+
+      {section === "login" && (
+        <section
+          style={{
+            ...styles.container,
+            ...styles.card,
+            marginTop: 28,
+            marginBottom: 35,
+            maxWidth: 620,
+          }}
+        >
+          <h1 style={{ fontSize: 30, marginTop: 0 }}>లాగిన్</h1>
+          {authLoading ? (
+            <p>లాగిన్ స్థితిని తనిఖీ చేస్తున్నాం...</p>
+          ) : authUser ? (
+            <div style={{ lineHeight: 1.9 }}>
+              <p style={{ color: "#17613e" }}>మీరు ఇప్పటికే లాగిన్ అయ్యారు.</p>
+              <p><strong>ఇమెయిల్:</strong> {authUser.email}</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                <button type="button" style={styles.button} onClick={() => navigate("survey")}>విద్యా సర్వేకు వెళ్లండి</button>
+                <button type="button" style={styles.secondaryButton} onClick={() => navigate("complaint")}>ఫిర్యాదు నమోదు</button>
+                <button type="button" style={styles.secondaryButton} onClick={logout}>లాగౌట్</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p style={{ color: "#61766a", lineHeight: 1.8 }}>
+                Supabaseలో ముందుగా సృష్టించిన ధృవీకరించిన ఇమెయిల్, పాస్‌వర్డ్ ఉపయోగించండి.
+              </p>
+              <form onSubmit={submitLogin}>
+                {label("ఇమెయిల్ *", "login-email")}
+                <input
+                  id="login-email"
+                  type="email"
+                  autoComplete="username"
+                  style={styles.field}
+                  required
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="మీ ఇమెయిల్"
+                />
+                {label("పాస్‌వర్డ్ *", "login-password")}
+                <input
+                  id="login-password"
+                  type="password"
+                  autoComplete="current-password"
+                  style={styles.field}
+                  required
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="మీ పాస్‌వర్డ్"
+                />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  <button type="submit" style={styles.button} disabled={loginLoading}>
+                    {loginLoading ? "లాగిన్ అవుతోంది..." : "లాగిన్ చేయండి"}
+                  </button>
+                  <button type="button" style={styles.secondaryButton} onClick={() => navigate("home")}>హోమ్‌కు తిరిగి వెళ్లండి</button>
+                </div>
+              </form>
+            </>
+          )}
         </section>
       )}
 
