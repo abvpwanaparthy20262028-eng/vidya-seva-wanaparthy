@@ -31,14 +31,19 @@ export default function LoginPage() {
       setMessage(
         "మీ ఇమెయిల్‌కు లాగిన్ లింక్ పంపించాం. మీ Gmail Inbox తెరిచి ఆ లింక్‌ను నొక్కండి."
       );
-    } catch (err) {
-      console.error("Login error:", err);
-      setError(
-        "లాగిన్ లింక్ పంపలేకపోయాం. Supabase సెట్టింగ్స్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి."
-      );
-    } finally {
-      setLoading(false);
-    }
+   
+} catch (err) {
+  console.error("Login error:", err);
+
+  setError(
+    err instanceof Error
+      ? `లాగిన్ సమస్య: ${err.message}`
+      : "తెలియని లాగిన్ సమస్య వచ్చింది."
+  );
+} finally {
+  setLoading(false);
+}
+
   }
 
   return (
